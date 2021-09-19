@@ -1,4 +1,4 @@
-﻿name: 'PublishNuget'
+name: 'PublishNuget'
 description: 'GitHub action to automate publishing NuGet packages when project version changes.'
 branding:
   icon: package
@@ -56,14 +56,14 @@ runs:
   - '-version_file_path'
   - ${{ inputs.version_file_path }}
   - '-version_regex'
-  - ${{ inputs.name }}
+  - ${{ inputs.version_regex }}
   - '-tag_format'
-  - ${{ inputs.branch }}
+  - ${{ inputs.tag_format }}
   - '-tag_commit'
-  - ${{ inputs.dir }}
+  - ${{ inputs.tag_commit }}
   - '-nuget_key'
-  - ${{ inputs.dir }}
+  - ${{ inputs.nuget_key }}
   - '-include_symbols'
-  - ${{ inputs.dir }}
+  - ${{ inputs.include_symbols }}
   - '-fail_on_build_error'
-  - ${{ inputs.dir }}
+  - ${{ inputs.fail_on_build_error }}
