@@ -18,9 +18,9 @@ inputs:
     required: false
   version_regex:
     description:
-      'The regex pattern which is used to extract the version info. Defaults to "^\s*<Version>(.*)<\/Version>\s*$".'
+      'The regex pattern which is used to extract the version info. Defaults to "^<Version>(.*)<\/Version>".'
     required: false
-    default: '^\s*<Version>(.*)<\/Version\s*$'
+    default: '<Version>(.*)<\/Version>'
   tag_format:
     description:
       'Format of the git tag. [*] gets replaced with the actual version number. Defaults to v[*].'
@@ -49,21 +49,18 @@ runs:
   using: 'docker'
   image: './src/PublishNuget/Dockerfile'
   args:
-  - '-name'
+  - '--name'
   - ${{ inputs.name }}
-  - '-project_file_path'
+  - '--project-file-path'
   - ${{ inputs.project_file_path }}
-  - '-version_file_path'
+  - '--version-file-path'
   - ${{ inputs.version_file_path }}
-  - '-version_regex'
+  - '--version-regex'
   - ${{ inputs.version_regex }}
-  - '-tag_format'
+  - '--tag-format'
   - ${{ inputs.tag_format }}
-  - '-tag_commit'
-  - ${{ inputs.tag_commit }}
-  - '-nuget_key'
+  - '--nuget-key'
   - ${{ inputs.nuget_key }}
-  - '-include_symbols'
-  - ${{ inputs.include_symbols }}
-  - '-fail_on_build_error'
-  - ${{ inputs.fail_on_build_error }}
+  - ${{ (inputs.tag_commit == true && '--tag-commit') || '' }}
+  - ${{ (inputs.include_symbols == true && '--include-symbols') || '' }}
+  - ${{ (inputs.fail_on_build_error == true && '--fail-on-build-error') || '' }}

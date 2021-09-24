@@ -1,34 +1,64 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace PublishNuget
 {
     internal static class GitHubProcess
     {
-        internal static async Task<bool> ExecuteCommandAsync(string command, Action<string?> exceptionCallback, Action<string?>? outputCallback)
+        internal static async Task<bool> ExecuteCommandAsync(string command, Action<string?> exceptionCallback, Action<string?>? outputCallback = null, string? loggedCommand = null)
         {
             using var process = new Process();
 
             var isSuccess = true;
 
-            process.StartInfo = new ProcessStartInfo("bash", command);
+            var splitIndex = command.IndexOf(' ');
+
+            process.StartInfo = new ProcessStartInfo(command[..splitIndex], command[(splitIndex + 1)..])
+            {
+                RedirectStandardInput = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+
+            outputCallback?.Invoke(string.IsNullOrWhiteSpace(loggedCommand) ? command : loggedCommand);
+
+            var outputBuilder = new StringBuilder();
+            var errorBuilder = new StringBuilder();
 
             process.ErrorDataReceived += (_, args) =>
             {
+                if (string.IsNullOrEmpty(args.Data))
+                    return;
+
                 isSuccess = false;
-                exceptionCallback.Invoke(args.Data);
+
+                errorBuilder.AppendLine(args.Data);
             };
 
-            process.OutputDataReceived += (_, args) => outputCallback?.Invoke(args?.Data);
+            process.OutputDataReceived += (_, args) =>
+            {
+                if (string.IsNullOrEmpty(args.Data))
+                    return;
 
-            outputCallback?.Invoke(command);
+                outputBuilder.AppendLine(args.Data);
+            };
 
             process.Start();
 
+            process.BeginErrorReadLine();
+            process.BeginOutputReadLine();
+
             await process.WaitForExitAsync();
 
-            return isSuccess;
+            if (outputBuilder.Length != 0)
+                outputCallback?.Invoke(outputBuilder.ToString());
+
+            if (errorBuilder.Length != 0)
+                exceptionCallback?.Invoke(errorBuilder.ToString());
+
+            return isSuccess && process.ExitCode == 0;
         }
     }
 }

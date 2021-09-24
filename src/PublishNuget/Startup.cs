@@ -17,11 +17,11 @@ using var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((services) =>
     {
         services.AddSingleton<HttpClient>();
-        services.AddLogging();
+        services.AddLogging(options => options.AddConsole());
     })
     .Build();
 
-var logger = Get<ILogger>(host);
+var logger = Get<ILogger<Program>>(host);
 
 logger.LogInformation("Parsing arguments...");
 
@@ -47,7 +47,7 @@ static TService Get<TService>(IHost host) where TService : notnull
 
 static async Task HandleProject(ActionInputs inputs, IHost host)
 {
-    var logger = Get<ILogger>(host);
+    var logger = Get<ILogger<Program>>(host);
     var httpClient = Get<HttpClient>(host);
 
     var versionRegex = new Regex(inputs.VersionRegex);
@@ -105,7 +105,7 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation($"Building package {inputs.Name}...");
 
-    if (!await GitHubProcess.ExecuteCommandAsync("dotnet build -c Release " + inputs.ProjectFilePath, ExceptionCallback, OutputCallback))
+    if (!await GitHubProcess.ExecuteCommandAsync(@$"dotnet build -c Release ""{inputs.ProjectFilePath}""", ExceptionCallback, OutputCallback))
     {
         if (inputs.FailOnBuildError)
         {
@@ -119,16 +119,21 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation($"Packing package {inputs.Name}...");
 
-    var packagePackCommand = $"dotnet pack {(inputs.IncludesSymbols ? "--include - symbols - p:SymbolPackageFormat=snupkg" : string.Empty)} --no-build -c Release {inputs.ProjectFilePath} -o .";
+    var tempFolder = Path.Combine(Path.GetTempPath(), "PublishNuget");
 
-    if (!await GitHubProcess.ExecuteCommandAsync(packagePackCommand, ExceptionCallback, OutputCallback))
+    if (!Directory.Exists(tempFolder))
+        Directory.CreateDirectory(tempFolder);
+
+    logger.LogInformation("Output Directory: " + tempFolder);
+
+    var packagePackCommand = @$"dotnet pack {(inputs.IncludesSymbols ? "--include-symbols -p:SymbolPackageFormat=snupkg" : string.Empty)} --no-build -c Release ""{inputs.ProjectFilePath}"" -o ""{tempFolder}""";
+
+    if (!await GitHubProcess.ExecuteCommandAsync(packagePackCommand, ExceptionCallback, OutputCallback) &&
+        inputs.FailOnBuildError)
     {
-        if (inputs.FailOnBuildError)
-        {
-            Environment.Exit(1);
+        Environment.Exit(1);
 
-            return;
-        }
+        return;
     }
 
     logger.LogInformation($"Packed package {inputs.Name}.");
@@ -148,26 +153,17 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
         }
     }
 
-    if (!await GitHubProcess.ExecuteCommandAsync($"dotnet nuget add source https://api.nuget.org/v3/index.json", ExceptionCallback, OutputCallback) ||
-        !await GitHubProcess.ExecuteCommandAsync("dotnet nuget enable source https://api.nuget.org/v3/index.json", ExceptionCallback, OutputCallback))
+    logger.LogInformation($"Pushing package {inputs.Name}...");
+
+    var packagePushCommand = $"dotnet nuget push *.nupkg -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n" : string.Empty)}";
+    var packageLogCommand = $"dotnet nuget push *.nupkg -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n" : string.Empty)}";
+
+    if (!await GitHubProcess.ExecuteCommandAsync(packagePushCommand, ExceptionCallback, OutputCallback, packageLogCommand) &&
+        inputs.FailOnBuildError)
     {
         Environment.Exit(1);
 
         return;
-    }
-
-    logger.LogInformation($"Pushing package {inputs.Name}...");
-
-    var packagePushCommand = $"dotnet nuget push *.nupkg -k {inputs.NugetKey} --skip-duplicate {(!inputs.IncludesSymbols ? " -n 1" : "")}";
-
-    if (!await GitHubProcess.ExecuteCommandAsync(packagePushCommand, ExceptionCallback, OutputCallback))
-    {
-        if (inputs.FailOnBuildError)
-        {
-            Environment.Exit(1);
-
-            return;
-        }
     }
 
     logger.LogInformation($"Packed package {inputs.Name}.");
@@ -180,7 +176,7 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
         => logger.LogError(msg);
 
     void OutputCallback(string? msg)
-        => logger.LogError(msg);
+        => logger.LogInformation(msg);
 }
 
 static async Task<string> GetVersionNumberFromFile(ILogger logger, string fileName, Regex regex)
@@ -203,5 +199,5 @@ static async Task<string> GetVersionNumberFromFile(ILogger logger, string fileNa
         Environment.Exit(1);
     }
 
-    return match.Value;
+    return match.Groups[1].Value;
 }
