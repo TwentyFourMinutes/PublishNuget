@@ -98,7 +98,19 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
     }
     else if (request.StatusCode == HttpStatusCode.NotFound)
     {
-        logger.LogInformation($"This is the first version '{fullVersion}', continuing...");
+        var response = await request.Content.ReadAsStringAsync();
+
+        if (response.Contains("BlobNotFound"))
+        {
+            logger.LogInformation($"This is the first version '{fullVersion}', continuing...");
+        }
+        else
+        {
+            logger.LogError($"Invalid response body: {response}");
+
+            Environment.Exit(1);
+            return;
+        }
     }
     else
     {
@@ -130,7 +142,7 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation("Output Directory: " + tempFolder);
 
-    var packagePackCommand = @$"dotnet pack {(inputs.IncludesSymbols ? "--include-symbols -p:SymbolPackageFormat=snupkg" : string.Empty)} --no-build -c Release ""{inputs.ProjectFilePath}"" -o ""{tempFolder}""";
+    var packagePackCommand = @$"dotnet pack{(inputs.IncludesSymbols ? " --include-symbols -p:SymbolPackageFormat=snupkg" : string.Empty)} --no-build -c Release ""{inputs.ProjectFilePath}"" -o ""{tempFolder}""";
 
     if (!await GitHubProcess.ExecuteCommandAsync(packagePackCommand, ExceptionCallback, OutputCallback) &&
         inputs.FailOnBuildError)
@@ -159,8 +171,8 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation($"Pushing package {inputs.Name}...");
 
-    var packagePushCommand = $"dotnet nuget push *.nupkg -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
-    var packageLogCommand = $"dotnet nuget push *.nupkg -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
+    var packagePushCommand = $"dotnet nuget push \"{Path.Combine(tempFolder, "*.nupkg")}\" -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
+    var packageLogCommand = $"dotnet nuget push \"{Path.Combine(tempFolder, "*.nupkg")}\" -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
 
     if (!await GitHubProcess.ExecuteCommandAsync(packagePushCommand, ExceptionCallback, OutputCallback, packageLogCommand) &&
         inputs.FailOnBuildError)
