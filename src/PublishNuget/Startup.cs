@@ -61,13 +61,17 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation($"Project '{inputs.Name}' found at '{inputs.ProjectFilePath}'.");
 
-    string versionNumber = await GetVersionNumberFromFile(logger, string.IsNullOrWhiteSpace(inputs.VersionFilePath) ? inputs.ProjectFilePath : inputs.VersionFilePath, versionRegex);
+    var versionNumber = await GetVersionNumberFromFile(logger, string.IsNullOrWhiteSpace(inputs.VersionFilePath) ? inputs.ProjectFilePath : inputs.VersionFilePath, versionRegex);
 
     var fullVersion = inputs.TagFormat.Replace("[*]", versionNumber);
 
     logger.LogInformation($"Extracted version: '{fullVersion}'");
 
-    using var request = await httpClient.GetAsync($"https://api.nuget.org/v3-flatcontainer/{inputs.Name}/index.json");
+    var nugetVersionUrl = $"https://api.nuget.org/v3-flatcontainer/{inputs.Name}/index.json";
+
+    logger.LogInformation($"Collecting version numbers from: {nugetVersionUrl}");
+
+    using var request = await httpClient.GetAsync(nugetVersionUrl);
 
     if (request.IsSuccessStatusCode)
     {
@@ -155,8 +159,8 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation($"Pushing package {inputs.Name}...");
 
-    var packagePushCommand = $"dotnet nuget push *.nupkg -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n" : string.Empty)}";
-    var packageLogCommand = $"dotnet nuget push *.nupkg -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n" : string.Empty)}";
+    var packagePushCommand = $"dotnet nuget push *.nupkg -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
+    var packageLogCommand = $"dotnet nuget push *.nupkg -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
 
     if (!await GitHubProcess.ExecuteCommandAsync(packagePushCommand, ExceptionCallback, OutputCallback, packageLogCommand) &&
         inputs.FailOnBuildError)
