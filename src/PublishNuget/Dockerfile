@@ -12,6 +12,6 @@ LABEL com.github.actions.description="GitHub action to automate publishing NuGet
 LABEL com.github.actions.icon="package"
 LABEL com.github.actions.color="green"
 
-FROM mcr.microsoft.com/dotnet/runtime:6.0
+FROM mcr.microsoft.com/dotnet/sdk:6.0
 COPY --from=build-env /app/out .
 ENTRYPOINT [ "dotnet", "/PublishNuget.dll" ]

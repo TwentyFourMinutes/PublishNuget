@@ -67,7 +67,7 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation($"Extracted version: '{fullVersion}'");
 
-    using var request = await httpClient.GetAsync("https://api.nuget.org/v3-flatcontainer/Venflow/index.json");
+    using var request = await httpClient.GetAsync($"https://api.nuget.org/v3-flatcontainer/{inputs.Name}/index.json");
 
     if (request.IsSuccessStatusCode)
     {
