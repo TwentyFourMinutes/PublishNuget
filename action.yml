@@ -63,7 +63,7 @@ runs:
   - ${{ inputs.nuget_key }}
   - '--tag-commit'
   - ${{ inputs.tag_commit }}
-  - --include-symbols
+  - '--include-symbols'
   - ${{ inputs.include_symbol }}
-  - --fail-on-build-error'
+  - '--fail-on-build-error'
   - ${{ inputs.fail_on_build_error }}
