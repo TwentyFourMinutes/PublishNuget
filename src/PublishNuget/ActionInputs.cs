@@ -35,11 +35,11 @@ namespace PublishNuget
             get => _tagFormat;
             set
             {
-                int index = 0, count = -1;
+                int index = -1, count = -1;
 
                 do
                 {
-                    index = value.IndexOf("[*]", index);
+                    index = value.IndexOf("[*]", index + 1);
 
                     count++;
                 } while (index != -1);

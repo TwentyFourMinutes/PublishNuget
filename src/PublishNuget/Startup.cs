@@ -36,9 +36,9 @@ parser.WithNotParsed(
         return;
     });
 
-await parser.WithParsedAsync(options => HandleProject(options, host));
-
 logger.LogInformation("Finished the parsing of the arguments.");
+
+await parser.WithParsedAsync(options => HandleProject(options, host));
 
 await host.RunAsync();
 
