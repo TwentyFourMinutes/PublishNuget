@@ -56,7 +56,7 @@ namespace PublishNuget
         [Option("tag-commit",
             Required = false,
             HelpText = "Determines whether or not to create a git tag. Default to true.")]
-        public bool TagCommit { get; set; } = false;
+        public bool? TagCommit { get; set; } = false;
 
         [Option("nuget-key",
             Required = true,
@@ -66,11 +66,11 @@ namespace PublishNuget
         [Option("include-symbols",
             Required = false,
             HelpText = "Determines whether or not to push symbols along with the NuGet package. Defaults to false.")]
-        public bool IncludesSymbols { get; set; } = false;
+        public bool? IncludesSymbols { get; set; } = false;
 
         [Option("fail-on-build-error",
             Required = false,
             HelpText = "Determines whether or not to fail on a build/pack error. Defaults to true.")]
-        public bool FailOnBuildError { get; set; } = true;
+        public bool? FailOnBuildError { get; set; } = true;
     }
 }

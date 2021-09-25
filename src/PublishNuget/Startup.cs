@@ -81,7 +81,7 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
         foreach (var element in document.RootElement.GetProperty("versions").EnumerateArray())
         {
-            if (element.GetString() == fullVersion)
+            if (element.GetString() == versionNumber)
             {
                 doesVersionExist = true;
 
@@ -91,7 +91,10 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
         if (doesVersionExist)
         {
-            logger.LogInformation($"The version '{fullVersion}' already exists.");
+            logger.LogWarning($"The version '{fullVersion}' already exists.");
+
+            Environment.Exit(0);
+            return;
         }
 
         logger.LogInformation($"The version '{fullVersion}' does not exist, continuing...");
@@ -117,16 +120,13 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
         logger.LogError($"Invalid Status code {request.StatusCode}: {await request.Content.ReadAsStringAsync()}");
     }
 
-    logger.LogInformation($"This is the first version '{fullVersion}', continuing...");
-
     logger.LogInformation($"Building package {inputs.Name}...");
 
     if (!await GitHubProcess.ExecuteCommandAsync(@$"dotnet build -c Release ""{inputs.ProjectFilePath}""", ExceptionCallback, OutputCallback))
     {
-        if (inputs.FailOnBuildError)
+        if (inputs.FailOnBuildError.Value)
         {
             Environment.Exit(1);
-
             return;
         }
     }
@@ -142,47 +142,45 @@ static async Task HandleProject(ActionInputs inputs, IHost host)
 
     logger.LogInformation("Output Directory: " + tempFolder);
 
-    var packagePackCommand = @$"dotnet pack{(inputs.IncludesSymbols ? " --include-symbols -p:SymbolPackageFormat=snupkg" : string.Empty)} --no-build -c Release ""{inputs.ProjectFilePath}"" -o ""{tempFolder}""";
+    var packagePackCommand = @$"dotnet pack{(inputs.IncludesSymbols.Value ? " --include-symbols -p:SymbolPackageFormat=snupkg" : string.Empty)} --no-build -c Release ""{inputs.ProjectFilePath}"" -o ""{tempFolder}""";
 
     if (!await GitHubProcess.ExecuteCommandAsync(packagePackCommand, ExceptionCallback, OutputCallback) &&
-        inputs.FailOnBuildError)
+        inputs.FailOnBuildError.Value)
     {
         Environment.Exit(1);
-
         return;
     }
 
     logger.LogInformation($"Packed package {inputs.Name}.");
 
-    if (inputs.TagCommit)
+    if (inputs.TagCommit.Value)
     {
-        logger.LogInformation($"Creating tag '{versionNumber}'.");
+        logger.LogInformation($"Creating tag '{fullVersion}'.");
 
-        if (!await GitHubProcess.ExecuteCommandAsync("git tag " + versionNumber, ExceptionCallback, OutputCallback) ||
-            !await GitHubProcess.ExecuteCommandAsync("git push origin " + versionNumber, ExceptionCallback, OutputCallback))
+        if (!await GitHubProcess.ExecuteCommandAsync("git tag " + fullVersion, ExceptionCallback, OutputCallback) ||
+            !await GitHubProcess.ExecuteCommandAsync("git push origin " + fullVersion, ExceptionCallback, OutputCallback))
         {
-            logger.LogError($"Tag '{versionNumber}' could not be created.");
+            logger.LogError($"Tag '{fullVersion}' could not be created.");
         }
         else
         {
-            logger.LogInformation($"Tag '{versionNumber}' created.");
+            logger.LogInformation($"Tag '{fullVersion}' created.");
         }
     }
 
     logger.LogInformation($"Pushing package {inputs.Name}...");
 
-    var packagePushCommand = $"dotnet nuget push \"{Path.Combine(tempFolder, "*.nupkg")}\" -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
-    var packageLogCommand = $"dotnet nuget push \"{Path.Combine(tempFolder, "*.nupkg")}\" -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols ? " -n 1" : string.Empty)}";
+    var packagePushCommand = $"dotnet nuget push \"{Path.Combine(tempFolder, "*.nupkg")}\" -k {inputs.NugetKey} -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols.Value ? " -n 1" : string.Empty)}";
+    var packageLogCommand = $"dotnet nuget push \"{Path.Combine(tempFolder, "*.nupkg")}\" -k *** -s https://api.nuget.org/v3/index.json --skip-duplicate{(!inputs.IncludesSymbols.Value ? " -n 1" : string.Empty)}";
 
     if (!await GitHubProcess.ExecuteCommandAsync(packagePushCommand, ExceptionCallback, OutputCallback, packageLogCommand) &&
-        inputs.FailOnBuildError)
+        inputs.FailOnBuildError.Value)
     {
         Environment.Exit(1);
-
         return;
     }
 
-    logger.LogInformation($"Packed package {inputs.Name}.");
+    logger.LogInformation($"Pushed package {inputs.Name}.");
 
     logger.LogInformation($"Finished.");
 
