@@ -64,6 +64,6 @@ runs:
   - '--tag-commit'
   - ${{ inputs.tag_commit }}
   - '--include-symbols'
-  - ${{ inputs.include_symbol }}
+  - ${{ inputs.include_symbols }}
   - '--fail-on-build-error'
   - ${{ inputs.fail_on_build_error }}
